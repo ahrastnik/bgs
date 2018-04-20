@@ -1,0 +1,12 @@
+*db/
+*greybox_tmp/
+*incremental_db/
+*output_files/
+*.qpf
+*.qsf
+*.qws
+*.vhd.bak
+
+simulation/modelsim/**
+!simulation/modelsim/*.do
+!simulation/modelsim/*.txt
