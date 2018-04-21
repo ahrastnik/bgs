@@ -11,14 +11,14 @@ package INSTRUCTS is
 	constant nop: instruct := 	x"00"; -- No OPeration
 	constant mov: instruct := 	x"01"; -- Move register to another register or memory location
 	constant lea: instruct :=	x"02"; -- Load effective address
-	constant push:	instruct := x"03"; -- Push register on stack
-	constant pop:	instruct := x"04"; -- Pop register from stack
+	constant push: instruct := 	x"03"; -- Push register on stack
+	constant pop: instruct :=	x"04"; -- Pop register from stack
 	constant cmp: instruct :=	x"05"; -- Compare registers
 	constant jmp: instruct := 	x"06"; -- jump to location
-	constant call: instruct := x"07"; -- call function
-	constant ret: instruct 	:= x"08"; -- Return from Function or Interrupt
-	constant sti: instruct 	:= x"09"; -- Set global interrupts flag
-	constant cli: instruct 	:= x"0A"; -- Clear global interrupts flag
+	constant call: instruct :=	x"07"; -- call function
+	constant ret: instruct 	:=	x"08"; -- Return from Function or Interrupt
+	constant sti: instruct 	:=	x"09"; -- Set global interrupts flag
+	constant cli: instruct 	:=	x"0A"; -- Clear global interrupts flag
 	
 	-- Conditional jumps
 	constant je: sub_inst :=	x"1"; -- Jump if equal
@@ -47,20 +47,20 @@ package INSTRUCTS is
 	constant dec: instruct :=	x"27"; -- decrement
 	
 	-- Logical
-	constant test: instruct := x"40"; -- test registers
-	constant inot: instruct := x"41"; -- one's complement negation
-	constant ineg: instruct := x"42"; -- two's complement negation
-	constant iand: instruct := x"43"; -- and
+	constant test: instruct := 	x"40"; -- test registers
+	constant inot: instruct := 	x"41"; -- one's complement negation
+	constant ineg: instruct := 	x"42"; -- two's complement negation
+	constant iand: instruct := 	x"43"; -- and
 	constant ior: instruct := 	x"44"; -- or
-	constant ixor: instruct := x"45"; -- Xor
-	constant ishr: instruct := x"46"; -- shift left
-	constant ishl: instruct := x"47"; -- shift right
-	constant irol: instruct := x"48"; -- rotate left
-	constant iror: instruct := x"49"; -- rotate right
+	constant ixor: instruct := 	x"45"; -- Xor
+	constant ishr: instruct := 	x"46"; -- shift left
+	constant ishl: instruct := 	x"47"; -- shift right
+	constant irol: instruct := 	x"48"; -- rotate left
+	constant iror: instruct := 	x"49"; -- rotate right
 	
 	-- Floats
-	constant fadd: instruct := x"60"; -- float add
-	constant fsbt: instruct := x"61"; -- float subtract
+	constant fadd: instruct := 	x"60"; -- float add
+	constant fsbt: instruct := 	x"61"; -- float subtract
 	constant fmul: instruct :=	x"62"; -- float multiply
 	constant fdiv: instruct :=	x"63"; -- float divide
 	
