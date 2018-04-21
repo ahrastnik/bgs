@@ -12,7 +12,7 @@ entity ALU is
 		clk, en: in std_logic;
 		op, a, b: in unsigned((BUS_WIDTH - 1) downto 0) := (others => '0');
 		result: out unsigned((BUS_WIDTH - 1) downto 0) := (others => '0');
-		carry, zero, sign, overflow: out std_logic := '0'
+		carry, zero, signd, overflow: out std_logic := '0'
 	);
 end ALU;
 
@@ -32,9 +32,9 @@ begin
 				when mul =>
 					acu <= resize(resize(a, BUS_WIDTH + 1) * b, BUS_WIDTH + 1);
 				when div =>
-					null;
+					acu <= (others => '0'); -- TODO
 				when idiv =>
-					null;
+					acu <= (others => '0'); -- TODO
 				when inc =>
 					acu <= resize(a, BUS_WIDTH + 1) + 1;
 				when dec =>
@@ -71,7 +71,7 @@ begin
 	result <= acu((BUS_WIDTH - 1) downto 0);
 	overflow <= (a(BUS_WIDTH - 1) and b(BUS_WIDTH - 1) and not acu(BUS_WIDTH - 1)) or (not a(BUS_WIDTH - 1) and not b(BUS_WIDTH - 1) and acu(BUS_WIDTH - 1));
 	carry <= acu(BUS_WIDTH);
-	sign <= acu(BUS_WIDTH - 1);
+	signd <= acu(BUS_WIDTH - 1);
 	zero <= '1' when acu = ('0' & x"00000000") else '0';
 		
 end Malibu;

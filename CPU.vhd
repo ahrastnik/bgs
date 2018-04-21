@@ -41,15 +41,15 @@ architecture Malibu of CPU is
 	signal stack: unsigned((BUS_WIDTH - 1) downto 0) := STACK_POINTER;-- Stack Pointer
 	signal stat: unsigned((BUS_WIDTH - 1) downto 0) := (others => '0');
 	
-	signal inst, inst_n: unsigned((BUS_WIDTH - 1) downto 0) := (others => '0');
+	signal inst, inst_n: unsigned((BUS_WIDTH - 1) downto 0) := (others => '0'); -- Instruction and next instruction
 	
 	-- General Purpose Registers
 	type gpr is array(0 to 15) of unsigned((BUS_WIDTH - 1) downto 0);-- General Purpose register
 	signal gprs: gpr := (others => (others => '0'));
 	
 	-- ALU
-	signal alu_en: std_logic;
-	signal op1, op2, result: unsigned((BUS_WIDTH - 1) downto 0);
+	signal alu_en: std_logic := '0';
+	signal op1, op2, result: unsigned((BUS_WIDTH - 1) downto 0) := (others => '0');
 	
 	component ALU
 		generic(
@@ -59,21 +59,21 @@ architecture Malibu of CPU is
 			clk, en: in std_logic;
 			op, a, b: in unsigned((BUS_WIDTH - 1) downto 0) := (others => '0');
 			result: out unsigned((BUS_WIDTH - 1) downto 0) := (others => '0');
-			carry, zero, sign, overflow: out std_logic := '0'
+			carry, zero, signd, overflow: out std_logic := '0'
 		);
 	end component;
 	
 begin
 	-- Initialize components
 	U_ALU: ALU generic map(BUS_WIDTH => BUS_WIDTH)
-		port map(clk => clk, en => alu_en, op => inst, a => op1, b => op2, result => result, zero => stat(0), sign => stat(1), carry => stat(2), overflow => stat(3));
+		port map(clk => clk, en => alu_en, op => inst, a => op1, b => op2, result => result, zero => stat(0), signd => stat(1), carry => stat(2), overflow => stat(3));
 
 	main:process(clk)
 	begin
 		clkr:if(rising_edge(clk)) then
 			we <= '0';
 			alu_en <= '0';
-			case state is
+			state_m:case state is
 				when boot =>
 					null;
 				when reset =>
@@ -96,7 +96,7 @@ begin
 						inst_n 	<= prog_data_b;
 						
 						-- Decode stage
-						dec:if(fetch_s = '1') then
+						dec_st:if(fetch_s = '1') then
 							-- Set the stage start flag
 							decode_s <= '1';
 							-- Load value from data memory
@@ -109,57 +109,59 @@ begin
 								op1 <= gprs(to_integer(inst(7 downto 4)));
 								op2 <= gprs(to_integer(inst(3 downto 0)));
 							end if;
-						end if dec;
+						end if dec_st;
 						
 						-- Execute stage
-						exe:if(decode_s = '1') then
+						exe_st:if(decode_s = '1') then
 							exe_inst:case( inst(31 downto 24) ) is
 								when nop =>
 									null;
 								when mov =>
 									mov_inst:case( inst(23 downto 20) ) is
 										when x"0" =>
-											null;
+											gprs(to_integer(inst(7 downto 4))) <= gprs(to_integer(inst(3 downto 0)));
 										when x"1" =>
-											null;
+											gprs(to_integer(inst(7 downto 4))) <= inst_n;
 										when x"2" =>
-											null;
+											gprs(to_integer(inst(7 downto 4))) <= data_i;
 										when x"3" =>
-											null;
+											data_o <= gprs(to_integer(inst(3 downto 0)));
 										when others =>
 											null;
 									end case mov_inst;
+									gprs(to_integer(inst(7 downto 4))) <= gprs(to_integer(inst(3 downto 0)));
 								when jmp =>
 									jmp_inst:case( inst(23 downto 20) ) is
-										when x"0" =>	
+										when x"0" =>
 											pc <= inst_n;
-										when jz =>
-											if(stat(0) = '1') then
-												pc <= inst_n;
-											end if;
-										when jnz =>
-											if(stat(0) = '0') then
-												pc <= inst_n;
-											end if;
-										when jc =>
-											if(stat(2) = '1') then
-												pc <= inst_n;
-											end if;
-										when jnc =>
-											if(stat(2) = '0') then
-												pc <= inst_n;
-											end if;
-										when js =>
-											if(stat(1) = '1') then
-												pc <= inst_n;
-											end if;
-										when jns =>
-											if(stat(1) = '0') then
-												pc <= inst_n;
-											end if;
+										-- COMPILATION MEMORY OVERFLOW ISSUE!!!(stat register is the cause)
+										-- when jz =>
+										-- 	if(stat(0) = '1') then
+										-- 		pc <= inst_n;
+										-- 	end if;
+										-- when jnz =>
+										-- 	if(stat(0) = '0') then
+										-- 		pc <= inst_n;
+										-- 	end if;
+										-- when jc =>
+										-- 	if(stat(2) = '1') then
+										-- 		pc <= inst_n;
+										-- 	end if;
+										-- when jnc =>
+										-- 	if(stat(2) = '0') then
+										-- 		pc <= inst_n;
+										-- 	end if;
+										-- when js =>
+										-- 	if(stat(1) = '1') then
+										-- 		pc <= inst_n;
+										-- 	end if;
+										-- when jns =>
+										-- 	if(stat(1) = '0') then
+										-- 		pc <= inst_n;
+										-- 	end if;
 										when others =>
 											null;
-									end case ;
+									end case jmp_inst;
 								when inc =>
 									null;
 								when dec =>
@@ -170,7 +172,7 @@ begin
 										gprs(to_integer(inst(7 downto 4))) <= result;
 									end if;
 							end case exe_inst;
-						end if exe;
+						end if exe_st;
 						
 						state <= run;
 					else
@@ -182,7 +184,7 @@ begin
 					else
 						state <= reset;
 					end if func_rst;
-			end case;
+			end case state_m;
 		end if clkr;
 	end process main;
 	
