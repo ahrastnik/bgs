@@ -6,7 +6,7 @@ use work.INSTRUCTS.all;
 
 entity CPU is
 	generic(
-		BUS_WIDTH: integer;
+		BUS_WIDTH: 	integer;
 		PROG_WIDTH: integer;
 		DATA_WIDTH: integer
 	);
@@ -25,23 +25,27 @@ end CPU;
 
 architecture Malibu of CPU is
 	-- Constants
-	constant PROG_START: 	unsigned((BUS_WIDTH - 1) downto 0) := x"00000008";
+	constant PROG_START: 	unsigned((BUS_WIDTH - 1) downto 0) := x"00000000";
 	constant STACK_POINTER: unsigned((BUS_WIDTH - 1) downto 0) := x"000000C0";
 	
 	-- States
-	type states is (boot, reset, run, func); -- run state is the pipeline
+	type states is (boot, reset, prefetch, run, func); -- run state is the pipeline
 	signal state: states := reset;
+
+	signal prog_adr:	unsigned((PROG_WIDTH - 1) downto 0);
 	
 	-- Stage start
-	signal fetch_s: std_logic := '0';
-	signal decode_s: std_logic := '0';
+	signal fetch_s:	 	std_logic := '0';
+	signal decode_s:	std_logic := '0';
+	signal execute_s: 	std_logic := '0';
 
 	-- CPU Properties
-	signal pc: unsigned((BUS_WIDTH - 1) downto 0) := PROG_START;-- Program Counter starts after the Interrupt Vector Table
-	signal stack: unsigned((BUS_WIDTH - 1) downto 0) := STACK_POINTER;-- Stack Pointer
-	signal stat: unsigned((BUS_WIDTH - 1) downto 0) := (others => '0');
+	signal pc: 		unsigned((BUS_WIDTH - 1) downto 0) := PROG_START;-- Program Counter starts after the Interrupt Vector Table
+	signal stack: 	unsigned((BUS_WIDTH - 1) downto 0) := STACK_POINTER;-- Stack Pointer
+	signal stat: 	unsigned((BUS_WIDTH - 1) downto 0) := (others => '0');
 	
-	signal inst, inst_n: unsigned((BUS_WIDTH - 1) downto 0) := (others => '0'); -- Instruction and next instruction
+	signal inst, inst_n: 			unsigned((BUS_WIDTH - 1) downto 0) := (others => '0'); -- Decode stage: Instruction and next instruction
+	signal exe_inst, exe_inst_n: 	unsigned((BUS_WIDTH - 1) downto 0) := (others => '0'); -- Decode stage: Instruction and next instruction
 	
 	-- General Purpose Registers
 	type gpr is array(0 to 15) of unsigned((BUS_WIDTH - 1) downto 0);-- General Purpose register
@@ -62,11 +66,58 @@ architecture Malibu of CPU is
 			carry, zero, signd, overflow: out std_logic := '0'
 		);
 	end component;
+
+	function pc_increment(prev_pc: unsigned; inst: unsigned; inst_n: unsigned) return unsigned is
+		variable pc: unsigned((BUS_WIDTH - 1) downto 0) := PROG_START;
+	begin
+		pc_inc:if(inst(31 downto 24) = jmp) then
+			-- Set it explicitly if jump command was issued
+			jmp_inst:case(inst(23 downto 20)) is
+				when x"0" =>
+					pc := inst_n;
+				-- COMPILATION MEMORY OVERFLOW ISSUE!!!(stat register is the cause)
+				-- when jz =>
+				-- 	if(stat(0) = '1') then
+				-- 		pc <= inst_n;
+				-- 	end if;
+				-- when jnz =>
+				-- 	if(stat(0) = '0') then
+				-- 		pc <= inst_n;
+				-- 	end if;
+				-- when jc =>
+				-- 	if(stat(2) = '1') then
+				-- 		pc <= inst_n;
+				-- 	end if;
+				-- when jnc =>
+				-- 	if(stat(2) = '0') then
+				-- 		pc <= inst_n;
+				-- 	end if;
+				-- when js =>
+				-- 	if(stat(1) = '1') then
+				-- 		pc <= inst_n;
+				-- 	end if;
+				-- when jns =>
+				-- 	if(stat(1) = '0') then
+				-- 		pc <= inst_n;
+				-- 	end if;
+				when others =>
+					pc := (others => '0');
+			end case jmp_inst;
+		else
+			-- Set the program counter
+			if(inst(16) = '1') then
+				pc := prev_pc + 2;
+			else
+				pc := prev_pc + 1;
+			end if;
+		end if pc_inc;
+		return pc;
+	end pc_increment;
 	
 begin
 	-- Initialize components
 	U_ALU: ALU generic map(BUS_WIDTH => BUS_WIDTH)
-		port map(clk => clk, en => alu_en, op => inst, a => op1, b => op2, result => result, zero => stat(0), signd => stat(1), carry => stat(2), overflow => stat(3));
+		port map(clk => clk, en => alu_en, op => exe_inst, a => op1, b => op2, result => result, zero => stat(0), signd => stat(1), carry => stat(2), overflow => stat(3));
 
 	main:process(clk)
 	begin
@@ -85,101 +136,94 @@ begin
 					if(rst = '1') then
 						state <= run;
 					end if;
+				when prefetch =>
+					pfetch_rst:if(rst = '1') then
+						-- Set program counter
+						pc <= pc_increment(pc, prog_data_a, prog_data_b);
+						-- Run pipeline
+						state <= run;
+					else
+						state <= reset;
+					end if pfetch_rst;
 				when run =>
 					run_rst:if(rst = '1') then
-						-- Fetch stage
-						fetch_s <= '1';
-						-- Increment the program counter
-						pc <= pc + 1;
-						-- Load current and next instructions
+						--fetch_s <= '1';
+						-- Load current and next instructions for decoding
 						inst 	<= prog_data_a;
 						inst_n 	<= prog_data_b;
+						-- Set program counter
+						pc <= pc_increment(pc, prog_data_a, prog_data_b);
+						-- Fetch stage
+						decode_s <= '1';
 						
 						-- Decode stage
-						dec_st:if(fetch_s = '1') then
+						dec_st:if(decode_s = '1') then
 							-- Set the stage start flag
-							decode_s <= '1';
+							execute_s <= '1';
+							-- Load current and next instructions for decoding
+							exe_inst 	<= inst;
+							exe_inst_n 	<= inst_n;
 							-- Load value from data memory
-							if (inst(16) = '1') then
+							if (inst(15 downto 12) > 0) then
 								data_adr <= inst_n;
 							end if;
-							-- Enable ALU if instruction is of type Arithmetic or Logic
-							if(inst(17) = '1') then
+							-- Enable ALU if instruction is of type Arithmetic or Logic and load operands
+							alu_req:if(inst(17) = '1') then
 								alu_en <= '1';
-								op1 <= gprs(to_integer(inst(11 downto 8)));
-								op2 <= gprs(to_integer(inst(7 downto 4)));
-							end if;
+								alu_load:case(inst(23 downto 20) ) is
+									when x"1" =>
+										op1 <= gprs(to_integer(inst(7 downto 4)));
+										op2 <= gprs(to_integer(inst(3 downto 0)));
+									when x"2" =>
+										op1 <= gprs(to_integer(inst(11 downto 8)));
+										op2 <= inst_n;
+									when x"3" =>
+										op1 <= gprs(to_integer(inst(7 downto 4)));
+										op2 <= inst_n;
+									when others =>
+										op1 <= gprs(to_integer(inst(11 downto 8)));
+										op2 <= gprs(to_integer(inst(7 downto 4)));
+								end case alu_load;
+							end if alu_req;
 						end if dec_st;
 						
 						-- Execute stage
-						exe_st:if(decode_s = '1') then
-							exe_inst:case( inst(31 downto 24) ) is
+						exe_st:if(execute_s = '1') then
+							-- Handle instructions
+							execute_inst:case(exe_inst(31 downto 24)) is
 								when nop =>
 									null;
 								when mov =>
-									mov_inst:case( inst(23 downto 20) ) is
+									mov_inst:case( exe_inst(23 downto 20) ) is
 										when x"0" =>
-											gprs(to_integer(inst(11 downto 8))) <= gprs(to_integer(inst(7 downto 4)));
+											gprs(to_integer(exe_inst(11 downto 8))) <= gprs(to_integer(exe_inst(7 downto 4)));
 										when x"1" =>
-											gprs(to_integer(inst(11 downto 8))) <= inst_n;
+											gprs(to_integer(exe_inst(11 downto 8))) <= exe_inst_n;
 										when x"2" =>
-											gprs(to_integer(inst(11 downto 8))) <= data_i;
+											gprs(to_integer(exe_inst(11 downto 8))) <= data_i;
 										when x"3" =>
-											data_o <= gprs(to_integer(inst(7 downto 4)));
+											data_o <= gprs(to_integer(exe_inst(7 downto 4)));
 										when others =>
 											null;
 									end case mov_inst;
-									
-								when jmp =>
-									jmp_inst:case( inst(23 downto 20) ) is
-										when x"0" =>
-											pc <= inst_n;
-										-- COMPILATION MEMORY OVERFLOW ISSUE!!!(stat register is the cause)
-										-- when jz =>
-										-- 	if(stat(0) = '1') then
-										-- 		pc <= inst_n;
-										-- 	end if;
-										-- when jnz =>
-										-- 	if(stat(0) = '0') then
-										-- 		pc <= inst_n;
-										-- 	end if;
-										-- when jc =>
-										-- 	if(stat(2) = '1') then
-										-- 		pc <= inst_n;
-										-- 	end if;
-										-- when jnc =>
-										-- 	if(stat(2) = '0') then
-										-- 		pc <= inst_n;
-										-- 	end if;
-										-- when js =>
-										-- 	if(stat(1) = '1') then
-										-- 		pc <= inst_n;
-										-- 	end if;
-										-- when jns =>
-										-- 	if(stat(1) = '0') then
-										-- 		pc <= inst_n;
-										-- 	end if;
-										when others =>
-											null;
-									end case jmp_inst;
 								when inc =>
-									if(inst(23 downto 20) = x"0") then
-										gprs(to_integer(inst(11 downto 8))) <= result;
-									elsif (inst(23 downto 20) = x"1") then
+									if(exe_inst(23 downto 20) = x"0") then
+										gprs(to_integer(exe_inst(11 downto 8))) <= result;
+									elsif (exe_inst(23 downto 20) = x"1") then
 										data_o <= result;
 									end if;
 								when dec =>
-									if(inst(23 downto 20) = x"0") then
-										gprs(to_integer(inst(11 downto 8))) <= result;
-									elsif (inst(23 downto 20) = x"1") then
+									if(exe_inst(23 downto 20) = x"0") then
+										gprs(to_integer(exe_inst(11 downto 8))) <= result;
+									elsif (exe_inst(23 downto 20) = x"1") then
 										data_o <= result;
 									end if;
 								when others =>
 									-- Retrieve the result from the ALU
-									if(inst(23 downto 20) >= x"0" and inst(23 downto 20) < x"4") then
-										gprs(to_integer(inst(11 downto 8))) <= result;
+									if(exe_inst(23 downto 20) >= x"0" and exe_inst(23 downto 20) < x"4") then
+										gprs(to_integer(exe_inst(11 downto 8))) <= result;
 									end if;
-							end case exe_inst;
+							end case execute_inst;
 						end if exe_st;
 						
 						state <= run;
@@ -188,7 +232,7 @@ begin
 					end if run_rst;
 				when func =>
 					func_rst:if(rst = '1') then
-						null;
+						state <= run;
 					else
 						state <= reset;
 					end if func_rst;
@@ -197,6 +241,11 @@ begin
 	end process main;
 	
 	-- Set program address
-	prog_adr_a <= pc((PROG_WIDTH - 1) downto 0);
-	prog_adr_b <= pc((PROG_WIDTH - 1) downto 0) + 1;
+	prog_adr 	<= PROG_START((PROG_WIDTH - 1) downto 0) when state = reset else
+					prog_data_b((PROG_WIDTH - 1) downto 0) when state = run and prog_data_a(31 downto 24) = jmp else
+					pc((PROG_WIDTH - 1) downto 0) + 1 when state = run and prog_data_a(16) = '0' else
+					pc((PROG_WIDTH - 1) downto 0) + 2 when state = run and prog_data_a(16) = '1' else
+					(others => '0');
+	prog_adr_a 	<= prog_adr;
+	prog_adr_b 	<= prog_adr + 1;
 end Malibu;

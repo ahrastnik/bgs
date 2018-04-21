@@ -1,3 +1,3 @@
 force clk 1 0, 0 {10 ps} -r 20ps
 force rst 0, 1 @60ps
-run 900ps
+run 1500ps
