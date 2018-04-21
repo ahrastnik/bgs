@@ -5,6 +5,8 @@
 *.qpf
 *.qsf
 *.qws
+*.qdf
+*.rpt
 *.vhd.bak
 
 simulation/modelsim/**

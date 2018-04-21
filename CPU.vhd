@@ -102,7 +102,7 @@ begin
 							-- Load value from data memory
 							if (inst(16) = '1') then
 								data_adr <= inst_n;
-							end if ;
+							end if;
 							-- Enable ALU if instruction is of type Arithmetic or Logic
 							if(inst(17) = '1') then
 								alu_en <= '1';
