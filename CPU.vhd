@@ -106,8 +106,8 @@ begin
 							-- Enable ALU if instruction is of type Arithmetic or Logic
 							if(inst(17) = '1') then
 								alu_en <= '1';
-								op1 <= gprs(to_integer(inst(7 downto 4)));
-								op2 <= gprs(to_integer(inst(3 downto 0)));
+								op1 <= gprs(to_integer(inst(11 downto 8)));
+								op2 <= gprs(to_integer(inst(7 downto 4)));
 							end if;
 						end if dec_st;
 						
@@ -119,17 +119,17 @@ begin
 								when mov =>
 									mov_inst:case( inst(23 downto 20) ) is
 										when x"0" =>
-											gprs(to_integer(inst(7 downto 4))) <= gprs(to_integer(inst(3 downto 0)));
+											gprs(to_integer(inst(11 downto 8))) <= gprs(to_integer(inst(7 downto 4)));
 										when x"1" =>
-											gprs(to_integer(inst(7 downto 4))) <= inst_n;
+											gprs(to_integer(inst(11 downto 8))) <= inst_n;
 										when x"2" =>
-											gprs(to_integer(inst(7 downto 4))) <= data_i;
+											gprs(to_integer(inst(11 downto 8))) <= data_i;
 										when x"3" =>
-											data_o <= gprs(to_integer(inst(3 downto 0)));
+											data_o <= gprs(to_integer(inst(7 downto 4)));
 										when others =>
 											null;
 									end case mov_inst;
-									gprs(to_integer(inst(7 downto 4))) <= gprs(to_integer(inst(3 downto 0)));
+									
 								when jmp =>
 									jmp_inst:case( inst(23 downto 20) ) is
 										when x"0" =>
@@ -163,13 +163,21 @@ begin
 											null;
 									end case jmp_inst;
 								when inc =>
-									null;
+									if(inst(23 downto 20) = x"0") then
+										gprs(to_integer(inst(11 downto 8))) <= result;
+									elsif (inst(23 downto 20) = x"1") then
+										data_o <= result;
+									end if;
 								when dec =>
-									null;
+									if(inst(23 downto 20) = x"0") then
+										gprs(to_integer(inst(11 downto 8))) <= result;
+									elsif (inst(23 downto 20) = x"1") then
+										data_o <= result;
+									end if;
 								when others =>
 									-- Retrieve the result from the ALU
 									if(inst(23 downto 20) >= x"0" and inst(23 downto 20) < x"4") then
-										gprs(to_integer(inst(7 downto 4))) <= result;
+										gprs(to_integer(inst(11 downto 8))) <= result;
 									end if;
 							end case exe_inst;
 						end if exe_st;
