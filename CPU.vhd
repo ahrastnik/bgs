@@ -8,7 +8,8 @@ entity CPU is
 	generic(
 		BUS_WIDTH: 	integer;
 		PROG_WIDTH: integer;
-		DATA_WIDTH: integer
+		DATA_WIDTH: integer;
+		GPR_NUM:	integer
 	);
 	port(
 		clk, rst: in std_logic;
@@ -16,9 +17,9 @@ entity CPU is
 		prog_adr_a, prog_adr_b: out unsigned((PROG_WIDTH - 1) downto 0);
 		prog_data_a, prog_data_b: in unsigned((BUS_WIDTH - 1) downto 0);
 		-- Data Memory
-		data_adr: out unsigned((BUS_WIDTH - 1) downto 0);
+		data_adr: out unsigned((BUS_WIDTH - 1) downto 0) := (others => '0');
 		data_i: in unsigned((BUS_WIDTH - 1) downto 0);
-		data_o: out unsigned((BUS_WIDTH - 1) downto 0);
+		data_o: out unsigned((BUS_WIDTH - 1) downto 0) := (others => '0');
 		we: out std_logic := '0'
 	);
 end CPU;
@@ -48,8 +49,10 @@ architecture Malibu of CPU is
 	signal exe_inst, exe_inst_n: 	unsigned((BUS_WIDTH - 1) downto 0) := (others => '0'); -- Decode stage: Instruction and next instruction
 	
 	-- General Purpose Registers
-	type gpr is array(0 to 15) of unsigned((BUS_WIDTH - 1) downto 0);-- General Purpose register
+	type gpr is array(0 to (GPR_NUM - 1)) of unsigned((BUS_WIDTH - 1) downto 0);-- General Purpose register
 	signal gprs: gpr := (others => (others => '0'));
+
+	signal dependencies:	unsigned((GPR_NUM - 1) downto 0) := (others => '0'); -- Busy flags for general purpose registers
 	
 	-- ALU
 	signal alu_en: std_logic := '0';
@@ -67,7 +70,7 @@ architecture Malibu of CPU is
 		);
 	end component;
 
-	function pc_increment(prev_pc: unsigned; inst: unsigned; inst_n: unsigned) return unsigned is
+	function pc_increment(prev_pc, inst, inst_n: unsigned) return unsigned is
 		variable pc: unsigned((BUS_WIDTH - 1) downto 0) := PROG_START;
 	begin
 		pc_inc:if(inst(31 downto 24) = jmp) then
@@ -113,6 +116,45 @@ architecture Malibu of CPU is
 		end if pc_inc;
 		return pc;
 	end pc_increment;
+
+	function dependency_checker(inst, regs: unsigned) return std_logic is
+		variable busy: std_logic := '0';
+	begin
+		insts:case( inst(31 downto 24) ) is
+			when mov =>
+				busy := '0';
+			when others =>
+				busy := '1';
+		end case insts;
+		return busy;
+	end dependency_checker;
+
+	function dependency(inst, regs_in: unsigned; state: std_logic) return unsigned is
+		variable regs_out: unsigned((GPR_NUM - 1) downto 0) := regs_in;
+	begin
+		alu_req:if(inst(17) = '1') then
+			-- Set dependencies for ALU instructions
+			if(inst(23 downto 20) >= x"0" and inst(23 downto 20) < x"4") then
+				regs_out(to_integer(inst(11 downto 8))) := state;
+			end if;
+		else
+			-- Set dependencies for other instructions
+			depn:case(inst(31 downto 24)) is
+				when mov =>
+					if(inst(23 downto 20) >= x"0" and inst(23 downto 20) < x"3") then
+						regs_out(to_integer(inst(11 downto 8))) := state;
+					end if;
+				when pop =>
+					if(inst(23 downto 20) = x"0") then
+						regs_out(to_integer(inst(11 downto 8))) := state;
+					end if;
+				when others =>
+					null;
+			end case depn;
+		end if alu_req;
+
+		return regs_out;
+	end dependency;
 	
 begin
 	-- Initialize components
@@ -131,7 +173,6 @@ begin
 					pc <= PROG_START;
 					stack <= STACK_POINTER;
 					-- Reset pipeline
-					fetch_s <= '0';
 					decode_s <= '0';
 					if(rst = '1') then
 						state <= run;
@@ -147,7 +188,6 @@ begin
 					end if pfetch_rst;
 				when run =>
 					run_rst:if(rst = '1') then
-						--fetch_s <= '1';
 						-- Load current and next instructions for decoding
 						inst 	<= prog_data_a;
 						inst_n 	<= prog_data_b;
@@ -167,9 +207,14 @@ begin
 							if (inst(15 downto 12) > 0) then
 								data_adr <= inst_n;
 							end if;
-							-- Enable ALU if instruction is of type Arithmetic or Logic and load operands
+							-- Set depencdencies
+							dependencies <= dependency(inst, dependencies, '1');
+							-- Handle ALU instructions
 							alu_req:if(inst(17) = '1') then
+								-- Enable ALU if instruction is of type Arithmetic or Logic
 								alu_en <= '1';
+								
+								--  Load operands in ALU
 								alu_load:case(inst(23 downto 20) ) is
 									when x"1" =>
 										op1 <= gprs(to_integer(inst(7 downto 4)));
@@ -189,6 +234,8 @@ begin
 						
 						-- Execute stage
 						exe_st:if(execute_s = '1') then
+							-- Clear depencdencies
+							dependencies <= dependency(exe_inst, dependencies, '0');
 							-- Handle instructions
 							execute_inst:case(exe_inst(31 downto 24)) is
 								when nop =>
@@ -206,6 +253,10 @@ begin
 										when others =>
 											null;
 									end case mov_inst;
+								when push =>
+									null;
+								when pop =>
+									null;
 								when inc =>
 									if(exe_inst(23 downto 20) = x"0") then
 										gprs(to_integer(exe_inst(11 downto 8))) <= result;

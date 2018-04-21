@@ -19,6 +19,7 @@ architecture Malibu of BGS is
 	constant PROG_WIDTH: integer := 9;
 	constant DATA_WIDTH: integer := 8;
 	constant IO_WIDTH:	integer :=	6;
+	constant GPR_NUM:	integer := 16;
 	
 	-- CPU
 	signal prog_adr_a, prog_adr_b: unsigned((PROG_WIDTH - 1) downto 0);
@@ -47,7 +48,8 @@ architecture Malibu of BGS is
 		generic(
 			BUS_WIDTH: integer;
 			PROG_WIDTH: integer;
-			DATA_WIDTH: integer
+			DATA_WIDTH: integer;
+			GPR_NUM:	integer
 		);
 		port(
 			clk, rst: in std_logic;
@@ -151,7 +153,7 @@ architecture Malibu of BGS is
 		);
 	end component;
 begin
-	U_CPU: CPU generic map(BUS_WIDTH => BUS_WIDTH, PROG_WIDTH => PROG_WIDTH, DATA_WIDTH => DATA_WIDTH)
+	U_CPU: CPU generic map(BUS_WIDTH => BUS_WIDTH, PROG_WIDTH => PROG_WIDTH, DATA_WIDTH => DATA_WIDTH, GPR_NUM => GPR_NUM)
 		port map(clk => clk, rst => rst, we => we,
 		prog_adr_a => prog_adr_a, prog_adr_b => prog_adr_b, prog_data_a => prog_data_a, prog_data_b => prog_data_b,
 		data_adr => data_adr, data_i => data_i, data_o => data_o);
