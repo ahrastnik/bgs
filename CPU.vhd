@@ -213,7 +213,7 @@ architecture Malibu of CPU is
 begin
 	-- Initialize components
 	U_ALU: ALU generic map(BUS_WIDTH => BUS_WIDTH)
-		port map(clk => clk, en => alu_en, op => exe_inst, a => op1, b => op2, result => result, zero => stat(0), signd => stat(1), carry => stat(2), overflow => stat(3));
+		port map(clk => clk, en => alu_en, op => inst, a => op1, b => op2, result => result, zero => stat(0), signd => stat(1), carry => stat(2), overflow => stat(3));
 
 	main:process(clk)
 	begin
@@ -245,17 +245,20 @@ begin
 				when run =>
 					run_rst:if(rst = '1') then
 						-- Fetch stage
+						-- Load current and next instructions for decoding
+						inst 	<= prog_data_a;
+						inst_n 	<= prog_data_b;
 						-- Set dependencies
 						dependencies <= dependency_set(prog_data_a, dependencies);
 						-- Check dependencies
 						dep:if(dependency_checker(prog_data_a, dependencies) = '1') then
-							-- Load current and next instructions for decoding
-							inst 	<= prog_data_a;
-							inst_n 	<= prog_data_b;
 							-- Set program counter
 							pc <= pc_increment(pc, prog_data_a, prog_data_b);
 							-- Enable decode stage
 							decode_s <= '1';
+							alu_req:if(prog_data_a(17) = '1') then
+								alu_en <= '1';
+							end if alu_req;
 						end if dep;
 						
 						
@@ -266,33 +269,10 @@ begin
 							-- Load current and next instructions for decoding
 							exe_inst 	<= inst;
 							exe_inst_n 	<= inst_n;
-							-- Check dependencies
-
 							-- Load value from data memory
 							if (inst(15 downto 12) > 0) then
 								data_adr <= inst_n;
 							end if;
-							
-							-- Handle ALU instructions
-							alu_req:if(inst(17) = '1') then
-								-- Enable ALU if instruction is of type Arithmetic or Logic
-								alu_en <= '1';
-								--  Load operands in ALU
-								alu_load:case(inst(23 downto 20)) is
-									when x"1" =>
-										op1 <= gprs(to_integer(inst(7 downto 4)));
-										op2 <= gprs(to_integer(inst(3 downto 0)));
-									when x"2" =>
-										op1 <= gprs(to_integer(inst(11 downto 8)));
-										op2 <= inst_n;
-									when x"3" =>
-										op1 <= gprs(to_integer(inst(7 downto 4)));
-										op2 <= inst_n;
-									when others =>
-										op1 <= gprs(to_integer(inst(11 downto 8)));
-										op2 <= gprs(to_integer(inst(7 downto 4)));
-								end case alu_load;
-							end if alu_req;
 						end if dec_st;
 						
 						-- Execute stage
@@ -332,7 +312,7 @@ begin
 									end if;
 								when others =>
 									-- Retrieve the result from the ALU
-									if(exe_inst(23 downto 20) >= x"0" and exe_inst(23 downto 20) < x"4") then
+									if(exe_inst(23 downto 20) >= x"0" and exe_inst(23 downto 20) < x"4" and exe_inst(17) = '1') then
 										gprs(to_integer(exe_inst(11 downto 8))) <= result;
 									end if;
 							end case execute_inst;
@@ -351,6 +331,13 @@ begin
 			end case state_m;
 		end if clkr;
 	end process main;
+
+	-- Set ALU operands
+	op1 <= gprs(to_integer(inst(7 downto 4))) when inst(23 downto 20) = x"1" or inst(23 downto 20) = x"3" else
+			gprs(to_integer(inst(11 downto 8)));
+	op2 <= gprs(to_integer(inst(3 downto 0))) when inst(23 downto 20) = x"1" else
+			inst_n when inst(23 downto 20) = x"2" or inst(23 downto 20) = x"3" else
+			gprs(to_integer(inst(7 downto 4)));
 	
 	-- Set program address
 	prog_adr 	<= PROG_START((PROG_WIDTH - 1) downto 0) when state = reset else

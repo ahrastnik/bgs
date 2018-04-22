@@ -17,10 +17,13 @@ add wave -noupdate /bgs/U_CPU/fetch_s
 add wave -noupdate /bgs/U_CPU/decode_s
 add wave -noupdate /bgs/U_CPU/execute_s
 add wave -noupdate -divider Pipeline
+add wave -noupdate -divider Fetch
 add wave -noupdate -radix hexadecimal /bgs/U_CPU/prog_data_a
 add wave -noupdate -radix hexadecimal /bgs/U_CPU/prog_data_b
+add wave -noupdate -divider Decode
 add wave -noupdate -radix hexadecimal -childformat {{/bgs/U_CPU/inst(31) -radix hexadecimal} {/bgs/U_CPU/inst(30) -radix hexadecimal} {/bgs/U_CPU/inst(29) -radix hexadecimal} {/bgs/U_CPU/inst(28) -radix hexadecimal} {/bgs/U_CPU/inst(27) -radix hexadecimal} {/bgs/U_CPU/inst(26) -radix hexadecimal} {/bgs/U_CPU/inst(25) -radix hexadecimal} {/bgs/U_CPU/inst(24) -radix hexadecimal} {/bgs/U_CPU/inst(23) -radix hexadecimal} {/bgs/U_CPU/inst(22) -radix hexadecimal} {/bgs/U_CPU/inst(21) -radix hexadecimal} {/bgs/U_CPU/inst(20) -radix hexadecimal} {/bgs/U_CPU/inst(19) -radix hexadecimal} {/bgs/U_CPU/inst(18) -radix hexadecimal} {/bgs/U_CPU/inst(17) -radix hexadecimal} {/bgs/U_CPU/inst(16) -radix hexadecimal} {/bgs/U_CPU/inst(15) -radix hexadecimal} {/bgs/U_CPU/inst(14) -radix hexadecimal} {/bgs/U_CPU/inst(13) -radix hexadecimal} {/bgs/U_CPU/inst(12) -radix hexadecimal} {/bgs/U_CPU/inst(11) -radix hexadecimal} {/bgs/U_CPU/inst(10) -radix hexadecimal} {/bgs/U_CPU/inst(9) -radix hexadecimal} {/bgs/U_CPU/inst(8) -radix hexadecimal} {/bgs/U_CPU/inst(7) -radix hexadecimal} {/bgs/U_CPU/inst(6) -radix hexadecimal} {/bgs/U_CPU/inst(5) -radix hexadecimal} {/bgs/U_CPU/inst(4) -radix hexadecimal} {/bgs/U_CPU/inst(3) -radix hexadecimal} {/bgs/U_CPU/inst(2) -radix hexadecimal} {/bgs/U_CPU/inst(1) -radix hexadecimal} {/bgs/U_CPU/inst(0) -radix hexadecimal}} -subitemconfig {/bgs/U_CPU/inst(31) {-height 15 -radix hexadecimal} /bgs/U_CPU/inst(30) {-height 15 -radix hexadecimal} /bgs/U_CPU/inst(29) {-height 15 -radix hexadecimal} /bgs/U_CPU/inst(28) {-height 15 -radix hexadecimal} /bgs/U_CPU/inst(27) {-height 15 -radix hexadecimal} /bgs/U_CPU/inst(26) {-height 15 -radix hexadecimal} /bgs/U_CPU/inst(25) {-height 15 -radix hexadecimal} /bgs/U_CPU/inst(24) {-height 15 -radix hexadecimal} /bgs/U_CPU/inst(23) {-height 15 -radix hexadecimal} /bgs/U_CPU/inst(22) {-height 15 -radix hexadecimal} /bgs/U_CPU/inst(21) {-height 15 -radix hexadecimal} /bgs/U_CPU/inst(20) {-height 15 -radix hexadecimal} /bgs/U_CPU/inst(19) {-height 15 -radix hexadecimal} /bgs/U_CPU/inst(18) {-height 15 -radix hexadecimal} /bgs/U_CPU/inst(17) {-height 15 -radix hexadecimal} /bgs/U_CPU/inst(16) {-height 15 -radix hexadecimal} /bgs/U_CPU/inst(15) {-height 15 -radix hexadecimal} /bgs/U_CPU/inst(14) {-height 15 -radix hexadecimal} /bgs/U_CPU/inst(13) {-height 15 -radix hexadecimal} /bgs/U_CPU/inst(12) {-height 15 -radix hexadecimal} /bgs/U_CPU/inst(11) {-height 15 -radix hexadecimal} /bgs/U_CPU/inst(10) {-height 15 -radix hexadecimal} /bgs/U_CPU/inst(9) {-height 15 -radix hexadecimal} /bgs/U_CPU/inst(8) {-height 15 -radix hexadecimal} /bgs/U_CPU/inst(7) {-height 15 -radix hexadecimal} /bgs/U_CPU/inst(6) {-height 15 -radix hexadecimal} /bgs/U_CPU/inst(5) {-height 15 -radix hexadecimal} /bgs/U_CPU/inst(4) {-height 15 -radix hexadecimal} /bgs/U_CPU/inst(3) {-height 15 -radix hexadecimal} /bgs/U_CPU/inst(2) {-height 15 -radix hexadecimal} /bgs/U_CPU/inst(1) {-height 15 -radix hexadecimal} /bgs/U_CPU/inst(0) {-height 15 -radix hexadecimal}} /bgs/U_CPU/inst
 add wave -noupdate -radix hexadecimal /bgs/U_CPU/inst_n
+add wave -noupdate -divider Execute
 add wave -noupdate -radix hexadecimal /bgs/U_CPU/exe_inst
 add wave -noupdate -radix hexadecimal /bgs/U_CPU/exe_inst_n
 add wave -noupdate -divider ALU
@@ -31,7 +34,7 @@ add wave -noupdate -radix unsigned /bgs/U_CPU/U_ALU/b
 add wave -noupdate -radix unsigned /bgs/U_CPU/U_ALU/acu
 add wave -noupdate -radix unsigned /bgs/U_CPU/U_ALU/result
 TreeUpdate [SetDefaultTree]
-WaveRestoreCursors {{Cursor 1} {70 ps} 0}
+WaveRestoreCursors {{Cursor 1} {100 ps} 0}
 quietly wave cursor active 1
 configure wave -namecolwidth 171
 configure wave -valuecolwidth 90
