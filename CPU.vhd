@@ -116,37 +116,91 @@ architecture Malibu of CPU is
 		end if pc_inc;
 		return pc;
 	end pc_increment;
-
+	
 	function dependency_checker(inst, regs: unsigned) return std_logic is
-		variable busy: std_logic := '0';
+		variable pass: std_logic := '1';
 	begin
-		insts:case( inst(31 downto 24) ) is
-			when mov =>
-				busy := '0';
-			when others =>
-				busy := '1';
-		end case insts;
-		return busy;
+		dep_chk:if(inst(17) = '0') then
+			insts:case( inst(31 downto 24) ) is
+				when mov =>
+					mov_inst:case(inst(23 downto 20) ) is
+						when x"0" =>
+							if(regs(to_integer(inst(7 downto 4))) = '1') then
+								pass := '0';
+							end if;
+						when x"3" =>
+							if(regs(to_integer(inst(7 downto 4))) = '1') then
+								pass := '0';
+							end if;
+						when others =>
+							null;
+					end case mov_inst;
+				when lea =>
+					if(regs(to_integer(inst(7 downto 4))) = '1') then
+						pass := '0';
+					end if;
+				when push =>
+					if(regs(to_integer(inst(11 downto 8))) = '1') then
+						pass := '0';
+					end if;
+				when cmp =>
+					cmp_chk:case(inst(23 downto 20)) is
+						when x"0" =>
+							if(regs(to_integer(inst(11 downto 8))) = '1' or regs(to_integer(inst(7 downto 4))) = '1') then
+								pass := '0';
+							end if;
+						when x"1" =>
+							if(regs(to_integer(inst(7 downto 4))) = '1') then
+								pass := '0';
+							end if;
+						when others =>
+							null;
+					end case cmp_chk;
+				when others =>
+					pass := '1';
+			end case insts;
+		else
+			alu_load:case(inst(23 downto 20) ) is
+				when x"1" =>
+					if(regs(to_integer(inst(7 downto 4))) = '1' or regs(to_integer(inst(3 downto 0))) = '1') then
+						pass := '0';
+					end if;
+				when x"2" =>
+					if(regs(to_integer(inst(11 downto 8))) = '1') then
+						pass := '0';
+					end if;
+				when x"3" =>
+					if(regs(to_integer(inst(7 downto 4))) = '1') then
+						pass := '0';
+					end if;
+				when others =>
+					if(regs(to_integer(inst(11 downto 8))) = '1' or regs(to_integer(inst(7 downto 4))) = '1') then
+						pass := '0';
+					end if;
+			end case alu_load;
+		end if dep_chk;
+
+		return pass;
 	end dependency_checker;
 
-	function dependency(inst, regs_in: unsigned; state: std_logic) return unsigned is
-		variable regs_out: unsigned((GPR_NUM - 1) downto 0) := regs_in;
+	function dependency_set(inst, regs_in: unsigned) return unsigned is
+		variable regs_out: unsigned((GPR_NUM - 1) downto 0) := (others => '0');
 	begin
 		alu_req:if(inst(17) = '1') then
 			-- Set dependencies for ALU instructions
 			if(inst(23 downto 20) >= x"0" and inst(23 downto 20) < x"4") then
-				regs_out(to_integer(inst(11 downto 8))) := state;
+				regs_out(to_integer(inst(11 downto 8))) := '1';
 			end if;
 		else
 			-- Set dependencies for other instructions
 			depn:case(inst(31 downto 24)) is
 				when mov =>
 					if(inst(23 downto 20) >= x"0" and inst(23 downto 20) < x"3") then
-						regs_out(to_integer(inst(11 downto 8))) := state;
+						regs_out(to_integer(inst(11 downto 8))) := '1';
 					end if;
 				when pop =>
 					if(inst(23 downto 20) = x"0") then
-						regs_out(to_integer(inst(11 downto 8))) := state;
+						regs_out(to_integer(inst(11 downto 8))) := '1';
 					end if;
 				when others =>
 					null;
@@ -154,7 +208,7 @@ architecture Malibu of CPU is
 		end if alu_req;
 
 		return regs_out;
-	end dependency;
+	end dependency_set;
 	
 begin
 	-- Initialize components
@@ -164,6 +218,8 @@ begin
 	main:process(clk)
 	begin
 		clkr:if(rising_edge(clk)) then
+			decode_s <= '0';
+			execute_s <= '0';
 			we <= '0';
 			alu_en <= '0';
 			state_m:case state is
@@ -188,13 +244,20 @@ begin
 					end if pfetch_rst;
 				when run =>
 					run_rst:if(rst = '1') then
-						-- Load current and next instructions for decoding
-						inst 	<= prog_data_a;
-						inst_n 	<= prog_data_b;
-						-- Set program counter
-						pc <= pc_increment(pc, prog_data_a, prog_data_b);
 						-- Fetch stage
-						decode_s <= '1';
+						-- Set dependencies
+						dependencies <= dependency_set(prog_data_a, dependencies);
+						-- Check dependencies
+						dep:if(dependency_checker(prog_data_a, dependencies) = '1') then
+							-- Load current and next instructions for decoding
+							inst 	<= prog_data_a;
+							inst_n 	<= prog_data_b;
+							-- Set program counter
+							pc <= pc_increment(pc, prog_data_a, prog_data_b);
+							-- Enable decode stage
+							decode_s <= '1';
+						end if dep;
+						
 						
 						-- Decode stage
 						dec_st:if(decode_s = '1') then
@@ -203,19 +266,19 @@ begin
 							-- Load current and next instructions for decoding
 							exe_inst 	<= inst;
 							exe_inst_n 	<= inst_n;
+							-- Check dependencies
+
 							-- Load value from data memory
 							if (inst(15 downto 12) > 0) then
 								data_adr <= inst_n;
 							end if;
-							-- Set depencdencies
-							dependencies <= dependency(inst, dependencies, '1');
+							
 							-- Handle ALU instructions
 							alu_req:if(inst(17) = '1') then
 								-- Enable ALU if instruction is of type Arithmetic or Logic
 								alu_en <= '1';
-								
 								--  Load operands in ALU
-								alu_load:case(inst(23 downto 20) ) is
+								alu_load:case(inst(23 downto 20)) is
 									when x"1" =>
 										op1 <= gprs(to_integer(inst(7 downto 4)));
 										op2 <= gprs(to_integer(inst(3 downto 0)));
@@ -234,8 +297,6 @@ begin
 						
 						-- Execute stage
 						exe_st:if(execute_s = '1') then
-							-- Clear depencdencies
-							dependencies <= dependency(exe_inst, dependencies, '0');
 							-- Handle instructions
 							execute_inst:case(exe_inst(31 downto 24)) is
 								when nop =>
@@ -294,6 +355,7 @@ begin
 	-- Set program address
 	prog_adr 	<= PROG_START((PROG_WIDTH - 1) downto 0) when state = reset else
 					prog_data_b((PROG_WIDTH - 1) downto 0) when state = run and prog_data_a(31 downto 24) = jmp else
+					pc((PROG_WIDTH - 1) downto 0) when state = run and dependency_checker(prog_data_a, dependencies) = '0' else
 					pc((PROG_WIDTH - 1) downto 0) + 1 when state = run and prog_data_a(16) = '0' else
 					pc((PROG_WIDTH - 1) downto 0) + 2 when state = run and prog_data_a(16) = '1' else
 					(others => '0');
