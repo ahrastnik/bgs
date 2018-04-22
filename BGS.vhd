@@ -26,6 +26,7 @@ architecture Malibu of BGS is
 	signal prog_data_a, prog_data_b: unsigned((BUS_WIDTH - 1) downto 0);
 	signal data_adr: unsigned((BUS_WIDTH - 1) downto 0);
 	signal data_i, data_o: unsigned((BUS_WIDTH - 1) downto 0);
+	signal data_len, data_slot: unsigned(1 downto 0);
 	signal we: std_logic;
 	
 	-- DMA
@@ -58,6 +59,7 @@ architecture Malibu of BGS is
 			prog_data_a, prog_data_b: in unsigned((BUS_WIDTH - 1) downto 0);
 			-- Data Memory
 			data_adr: out unsigned((BUS_WIDTH - 1) downto 0);
+			data_len, data_slot: out unsigned(1 downto 0) := (others => '0');
 			data_i: in unsigned((BUS_WIDTH - 1) downto 0);
 			data_o: out unsigned((BUS_WIDTH - 1) downto 0);
 			we: out std_logic := '0'
@@ -78,7 +80,8 @@ architecture Malibu of BGS is
 			we_i: 	in std_logic;
 			adr_i: 	in unsigned((BUS_WIDTH - 1) downto 0);
 			prog_adr_a_i, prog_adr_b_i: 	in unsigned((PROG_WIDTH - 1) downto 0);
-			data_i: 	in unsigned((BUS_WIDTH - 1) downto 0);
+			data_i: 				in unsigned((BUS_WIDTH - 1) downto 0);
+			data_len, data_slot:	in unsigned(1 downto 0);
 			-- CPU Outputs
 			data_o: out unsigned((BUS_WIDTH - 1) downto 0);
 			prog_a, prog_b: out unsigned((BUS_WIDTH - 1) downto 0);
@@ -156,10 +159,10 @@ begin
 	U_CPU: CPU generic map(BUS_WIDTH => BUS_WIDTH, PROG_WIDTH => PROG_WIDTH, DATA_WIDTH => DATA_WIDTH, GPR_NUM => GPR_NUM)
 		port map(clk => clk, rst => rst, we => we,
 		prog_adr_a => prog_adr_a, prog_adr_b => prog_adr_b, prog_data_a => prog_data_a, prog_data_b => prog_data_b,
-		data_adr => data_adr, data_i => data_i, data_o => data_o);
+		data_adr => data_adr, data_len => data_len, data_slot => data_slot, data_i => data_i, data_o => data_o);
 		
-	U_DMA: DMA generic map(IO_SPACE => 32, SRAM_SPACE => 128, BUS_WIDTH => BUS_WIDTH, PROG_WIDTH => PROG_WIDTH, DATA_WIDTH => DATA_WIDTH)
-		port map(clk => clk, we_i => we, adr_i => data_adr, data_i => data_o, data_o => data_i,
+	U_DMA: DMA generic map(IO_SPACE => 32, SRAM_SPACE => 96, BUS_WIDTH => BUS_WIDTH, PROG_WIDTH => PROG_WIDTH, DATA_WIDTH => DATA_WIDTH)
+		port map(clk => clk, we_i => we, adr_i => data_adr, data_len => data_len, data_slot => data_slot, data_i => data_o, data_o => data_i,
 			io_we => io_we, io_adr => io_adr, io_mem => io_mem, io_data_i => io_conn(2), io_data_o => io_conn(0),
 			prog_we_a => prog_we_a, prog_we_b => prog_we_b, prog_adr_a_i => prog_adr_a, prog_adr_b_i => prog_adr_b, prog_adr_a_o => prog_adr_a_o, prog_adr_b_o => prog_adr_b_o,
 			prog_a => prog_data_a, prog_b => prog_data_b, prog_data_a_i => prog_data_a_i, prog_data_b_i => prog_data_b_i, prog_data_o => prog_data_o,

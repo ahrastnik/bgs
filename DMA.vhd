@@ -17,6 +17,7 @@ entity DMA is
 		adr_i: 	in unsigned((BUS_WIDTH - 1) downto 0);
 		prog_adr_a_i, prog_adr_b_i: 	in unsigned((PROG_WIDTH - 1) downto 0);
 		data_i: 	in unsigned((BUS_WIDTH - 1) downto 0);
+		data_len, data_slot:	in unsigned(1 downto 0);
 		-- CPU Outputs
 		data_o: out unsigned((BUS_WIDTH - 1) downto 0);
 		prog_a, prog_b: out unsigned((BUS_WIDTH - 1) downto 0);
@@ -75,10 +76,12 @@ begin
 	data_en <= '1' when space = sram else '0';
 	-- Forward Register Address
 	io_adr	<= adr_i(5 downto 0) when space = io else (others => '0');
-	data_adr	<= std_logic_vector(adr_i(DATA_WIDTH - 1 downto 0)) when space = sram else (others => '0');
+	--data_adr	<= std_logic_vector(adr_i((DATA_WIDTH) - 1 downto 0)) when space = sram else (others => '0');
+	--data_adr <= std_logic_vector(adr_i((DATA_WIDTH - 1) downto 0) - (x"0" & "00" & data_slot));
+	data_adr <= std_logic_vector(adr_i((DATA_WIDTH - 1) downto 0) - (adr_i((DATA_WIDTH - 1) downto 0) mod 4)) when space = sram else (others => '0');
 	-- Forward WE -> Write Enable
 	io_we		<= we_i when space = io 	else '0';
-	data_we	<= we_i when space = sram 	else '0';
+	data_we		<= we_i when space = sram 	else '0';
 	-- Forward Data to CPU
 	data_o <= io_data_i when space = io and we_i = '0' else
 				unsigned(data_data_i) when space = sram	and we_i = '0'	else

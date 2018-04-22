@@ -18,6 +18,7 @@ entity CPU is
 		prog_data_a, prog_data_b: in unsigned((BUS_WIDTH - 1) downto 0);
 		-- Data Memory
 		data_adr: out unsigned((BUS_WIDTH - 1) downto 0) := (others => '0');
+		data_len, data_slot: out unsigned(1 downto 0) := (others => '0');
 		data_i: in unsigned((BUS_WIDTH - 1) downto 0);
 		data_o: out unsigned((BUS_WIDTH - 1) downto 0) := (others => '0');
 		we: out std_logic := '0'
@@ -261,7 +262,6 @@ begin
 							end if alu_req;
 						end if dep;
 						
-						
 						-- Decode stage
 						dec_st:if(decode_s = '1') then
 							-- Set the stage start flag
@@ -270,8 +270,10 @@ begin
 							exe_inst 	<= inst;
 							exe_inst_n 	<= inst_n;
 							-- Load value from data memory
-							if (inst(15 downto 12) > 0) then
+							if (inst(13 downto 12) > 0) then
 								data_adr <= inst_n;
+								data_len <= inst(13 downto 12);
+								data_slot <= inst(15 downto 14);
 							end if;
 						end if dec_st;
 						
@@ -291,6 +293,7 @@ begin
 											gprs(to_integer(exe_inst(11 downto 8))) <= data_i;
 										when x"3" =>
 											data_o <= gprs(to_integer(exe_inst(7 downto 4)));
+											we <= '1';
 										when others =>
 											null;
 									end case mov_inst;
@@ -339,7 +342,7 @@ begin
 			inst_n when inst(23 downto 20) = x"2" or inst(23 downto 20) = x"3" else
 			gprs(to_integer(inst(7 downto 4)));
 	
-	-- Set program address
+	-- Set program memory address
 	prog_adr 	<= PROG_START((PROG_WIDTH - 1) downto 0) when state = reset else
 					prog_data_b((PROG_WIDTH - 1) downto 0) when state = run and prog_data_a(31 downto 24) = jmp else
 					pc((PROG_WIDTH - 1) downto 0) when state = run and dependency_checker(prog_data_a, dependencies) = '0' else
